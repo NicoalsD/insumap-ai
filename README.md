@@ -6,7 +6,17 @@ La IA solo apoya al médico: nunca da dosis al paciente y cada salida tiene un r
 
 ## Estado
 
-En construcción (Fase 0: documentación y planeación).
+Fase 1 en servicio: el contrato v1 con el backend ([Contrato-IA](https://github.com/NicoalsD/insumap-backend/blob/develop/docs/Contrato-IA.md)).
+
+| Endpoint | Caso | Modelo de esta versión | Respaldo |
+|---|---|---|---|
+| `POST /v1/glucose-forecasts` | IA1 | Tendencia amortiguada con cuantiles (`damped-trend`) | Extrapolación lineal (`fallback-linear@1.0.0`) |
+| `POST /v1/risk-assessments` | IA2, IA7 | Logístico con pesos fijados a mano, sin calibrar (`risk-logistic`) | Reglas del backend |
+| `POST /v1/clinical-summaries` | IA5 | LLM compatible con OpenAI (Gemini) con verificación numérica | Plantilla determinista |
+| `POST /v1/assistant-replies` | IA6 | LLM con cadena de guardrails y material aprobado | Respuestas predefinidas |
+| `GET /v1/health`, `/v1/ready`, `/v1/models` | | | |
+
+Pendiente: Chronos-Bolt (IA1), modelos de scikit-learn entrenados con el simulador (IA2, IA7), `pattern-detections` (IA3) y `titration-suggestions` (IA4).
 
 ## Repositorios de Insumap
 
@@ -24,17 +34,24 @@ Python 3.13, FastAPI, scikit-learn, Chronos-Bolt (CPU), SDK de un LLM con API co
 
 ## Inicio rápido
 
-> Disponible desde la Fase 1.
-
 ```bash
 uv sync
-uv run uvicorn insumap_ai.main:app --reload     # servicio en http://localhost:8001
-uv run pytest
-uv run ruff check .
-uv run mypy .
+cp .env.example .env          # pon AI_SERVICE_TOKEN (y el LLM si lo usas)
+set -a; . ./.env; set +a
+uv run uvicorn --factory insumap_ai.main:app --port 8001   # Swagger en /docs
+uv run pytest && uv run ruff check . && uv run mypy
 ```
 
-El modo offline (determinista) permite correr pruebas y CI sin proveedor de LLM.
+Con `AI_PROVIDER_FAMILY=offline` no hay LLM: las pruebas y la CI corren sin red, y IA5 e IA6 responden con su respaldo. Para usar Gemini:
+
+```bash
+AI_PROVIDER_FAMILY=openai_compatible
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+LLM_MODEL=<modelo listado en GET {LLM_BASE_URL}models>
+LLM_API_KEY=<clave de Google AI Studio>
+```
+
+En el backend, `AI_SERVICE_URL=http://localhost:8001` y el mismo `AI_SERVICE_TOKEN`.
 
 ## Documentación
 
